@@ -29,3 +29,15 @@ backup/
 
 # OS
 .DS_Store
+
+# Local backups and generated packages
+/VulnLens-AI/
+/ai_service.py.save
+/ai_service_gemini_backup.py
+/dist/
+
+# Local backups and generated packages
+/VulnLens-AI/
+/ai_service.py.save
+/ai_service_gemini_backup.py
+/dist/
