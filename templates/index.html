@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>VulnLens AI | Security Dashboard</title>
+
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+
+    <header class="topbar">
+        <div class="brand">
+            <span class="brand-icon">V</span>
+
+            <div>
+                <h1>VulnLens AI</h1>
+                <p>AI-Powered Security Analysis</p>
+            </div>
+        </div>
+
+        <span class="status">
+            <span class="status-dot"></span>
+            Local Scanner Report
+        </span>
+    </header>
+
+    <main class="container">
+
+        <section class="hero">
+            <div>
+                <p class="eyebrow">SECURITY OVERVIEW</p>
+
+                <h2>Find vulnerabilities.<br>
+                    Understand the risks.</h2>
+
+                <p class="hero-description">
+                    Identify potentially dangerous Python code and
+                    understand the findings before deciding how to fix them.
+                </p>
+            </div>
+
+            <div class="shield">🛡️</div>
+        </section>
+
+        {% if errors %}
+        <section class="notice">
+            <strong>Report notice</strong>
+            <ul>
+                {% for error in errors %}
+                <li>{{ error }}</li>
+                {% endfor %}
+            </ul>
+        </section>
+        {% endif %}
+
+        <section class="stats">
+
+            <article class="stat-card">
+                <p>Total Findings</p>
+                <h3>{{ summary.total }}</h3>
+                <span>Detected by Bandit</span>
+            </article>
+
+            <article class="stat-card high">
+                <p>High Severity</p>
+                <h3>{{ summary.high }}</h3>
+                <span>Requires careful review</span>
+            </article>
+
+            <article class="stat-card medium">
+                <p>Medium Severity</p>
+                <h3>{{ summary.medium }}</h3>
+                <span>Review recommended</span>
+            </article>
+
+            <article class="stat-card low">
+                <p>Low Severity</p>
+                <h3>{{ summary.low }}</h3>
+                <span>Review when appropriate</span>
+            </article>
+
+        </section>
+
+        <section class="section-heading">
+    <div class="scan-controls">
+    <span class="count" id="finding-count">
+        {{ summary.total }} findings
+    </span>
+
+    <label for="project-path">Python project directory:</label>
+
+    <input
+        type="text"
+        id="project-path"
+        class="project-path-input"
+        placeholder="/home/miles/my-python-app"
+        value="/home/miles/vulnlens-demo"
+        autocomplete="off"
+    >
+
+    <button
+        class="scan-button"
+        id="scan-button"
+        type="button"
+        onclick="scanProject()"
+    >
+        🔍 Scan Project
+    </button>
+</div>
+</section>
+
+<p id="scan-status" class="scan-status" role="status"></p>
+
+        <section class="findings">
+
+            {% for finding in findings %}
+
+            <article class="finding-card">
+
+                <div class="finding-top">
+                    <span class="rule">
+                        {{ finding.test_id or "Unknown Rule" }}
+                    </span>
+
+                    <span class="severity
+                        {{ finding.issue_severity|lower }}">
+                        {{ finding.issue_severity or "UNKNOWN" }}
+                    </span>
+                </div>
+
+
+                <h3>{{ finding.issue_text or "Security finding" }}</h3>
+
+                <div class="location">
+                    <span>📄</span>
+
+                    {{ finding.filename or "Unknown file" }}
+
+                    {% if finding.line_number %}
+                    <span class="line">
+                        Line {{ finding.line_number }}
+                    </span>
+                    {% endif %}
+                </div>
+
+                {% if finding.code %}
+                <pre><code>{{ finding.code }}</code></pre>
+                {% endif %}
+                <button
+    class="ai-button"
+    type="button"
+    onclick="explainFinding(this, {{ loop.index0 }})"
+>
+    🤖 Explain with AI
+</button>
+
+<div
+    class="ai-result"
+    id="ai-result-{{ loop.index0 }}"
+    hidden
+>
+    <p class="ai-status">Waiting for analysis...</p>
+    <pre class="ai-explanation"></pre>
+</div>
+
+                <details>
+                    <summary>View more details</summary>
+
+                    <p>
+                        <strong>Confidence:</strong>
+                        {{ finding.issue_confidence or "Not specified" }}
+                    </p>
+
+                    {% if finding.more_info %}
+                    <p>
+                        <strong>Reference:</strong>
+                        {{ finding.more_info }}
+                    </p>
+                    {% endif %}
+                </details>
+
+            </article>
+
+            {% else %}
+
+            <article class="empty-state">
+                <h3>No findings available</h3>
+                <p>
+                    Run the scanner to generate a report, then refresh
+                    this dashboard.
+                </p>
+            </article>
+
+            {% endfor %}
+
+        </section>
+
+        <section class="disclaimer">
+            <strong>Important:</strong>
+
+            Bandit findings identify potential security issues and are
+            not proof that an application is exploitable. Review the
+            surrounding code and test proposed changes before deployment.
+        </section>
+
+    </main>
+
+    <footer>
+        VulnLens AI · Hackathon Prototype · Built for Developers
+    </footer>
+
+<script>
+// Remember the last selected project directory
+const projectInput = document.getElementById("project-path");
+
+const savedProjectPath = localStorage.getItem("vulnlens_project_path");
+
+if (savedProjectPath) {
+    projectInput.value = savedProjectPath;
+}
+
+projectInput.addEventListener("input", () => {
+    localStorage.setItem(
+        "vulnlens_project_path",
+        projectInput.value
+    );
+});
+async function explainFinding(button, findingId) {
+    const panel = document.getElementById(`ai-result-${findingId}`);
+    const status = panel.querySelector(".ai-status");
+    const output = panel.querySelector(".ai-explanation");
+
+    panel.hidden = false;
+    button.disabled = true;
+    status.textContent = "Gemini is analysing this finding...";
+    output.textContent = "";
+
+    try {
+        const response = await fetch(
+            `/api/findings/${findingId}/explain`,
+            { method: "POST" }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.detail || "AI analysis failed.");
+        }
+
+        status.textContent = "AI explanation — review before applying";
+        output.textContent = data.explanation;
+
+    } catch (error) {
+        status.textContent = `Error: ${error.message}`;
+    } finally {
+        button.disabled = false;
+    }
+}
+async function scanProject() {
+    const button = document.getElementById("scan-button");
+    const status = document.getElementById("scan-status");
+
+    button.disabled = true;
+    button.textContent = "Scanning...";
+    status.textContent = "Bandit is scanning the project...";
+
+    try {
+        const projectPath = document.getElementById("project-path").value.trim();
+
+if (!projectPath) {
+    throw new Error("Please enter a project directory.");
+}
+
+const response = await fetch("/api/scan", {
+    method: "POST",
+    headers: {
+        "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+        project_path: projectPath
+    })
+});
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.detail || "The scan failed.");
+        }
+
+        status.textContent = `Scan complete: ${data.summary.total} finding(s) detected.`;
+
+button.textContent = "Scan Complete!";
+button.disabled = false;
+
+setTimeout(() => {
+    window.location.reload();
+}, 1200);
+
+    } catch (error) {
+        status.textContent = `Scan error: ${error.message}`;
+        button.disabled = false;
+        button.textContent = "🔍 Scan Project Again";
+    }
+}
+</script>
+</body>
+</html>
+
+	

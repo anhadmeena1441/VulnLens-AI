@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Generated reports
+report.json
+
+# Backups
+*.backup
+*.bak
+main_before_semgrep.py
+main_backup.py
+backup/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
